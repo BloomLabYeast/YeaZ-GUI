@@ -15,15 +15,26 @@ class PopulationBatch:
         import unet.neural_network as nn
         from unet.segment import cell_merge, correct_artefacts
 
+        # assign attributes
+        self.directory = directory
+        self.glob_pattern = glob_pattern
+        self.fluor_channel_list = fluor_channel_list
+        self.bin_trans = True
+        self.min_dist_pixels = min_dist_pixels
+
+        # generate masks
         glob_files = glob(os.path.join(directory, glob_pattern))
+        self.glob_files = glob_files
         # the glob pattern should contain all trans image files to process
-        mask_list = []
+        mask_im_list = []
+        fluor_list_list = [] #this will be a list of lists
+        trans_im_list = []
         for i, file in enumerate(glob_files):
             print('Processing image ' + str(i+1) + ' of ' +str(len(glob_files)))
             im_trans = imread(file)
+            trans_im_list.append(im_trans)
             if bin_trans:
                 im_trans = downscale_local_mean(im_trans, (2,2))
-
             im_prediction = nn.prediction(im_trans, True)
             threshold_value = threshold_isodata(im_prediction)
             im_binary = im_prediction
@@ -35,10 +46,17 @@ class PopulationBatch:
             im_watershed = watershed(-im_distance_transform, markers=im_label, mask=im_binary, connectivity=2)
             im_merged = cell_merge(im_watershed, im_prediction)
             im_correct = correct_artefacts(im_merged)
-            mask_list.append(im_correct)
+            mask_im_list.append(im_correct)
+            # read in the fluor channels
+            channel_im_list = []
+            for channel_string in fluor_channel_list:
+                channel_im = imread(file.replace('Trans', channel_string))
+                channel_im_list.append(channel_im)
 
-        self.mask_list = mask_list
-
+            fluor_list_list.append(channel_im_list)
+        self.mask_im_list = mask_im_list
+        self.fluor_list_list = fluor_list_list
+        self.trans_im_list = trans_im_list
 
 
 
